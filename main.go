@@ -22,7 +22,9 @@ type WordSetMasks struct {
 }
 
 func main() {
-	wordStrings, err := ReadUniqWordStrings("alastalon_salissa.txt")
+	srcFile := "alastalon_salissa.txt"
+	whitelist := "abcdefghijklmnopqrstuvwzyxåäö"
+	wordStrings, err := ReadUniqWordStrings(srcFile, whitelist)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -33,7 +35,7 @@ func main() {
 
 	wordMaskCount := len(wordSetMasks.wordsByMasks)
 	fmt.Printf("unique words: %d\n", len(wordStrings))
-	fmt.Printf("unique charsets: %d\n", wordMaskCount)
+	fmt.Printf("words with unique set of characters: %d\n", wordMaskCount)
 
 	// calculate plz
 	topWeight := uint8(0)
@@ -88,7 +90,6 @@ func makeWordSetMasks(wordSet WordSet) WordSetMasks {
 	wordsByMasks := make(map[uint64][]Word)
 	for _, word := range wordSet.words {
 		mask := makeWordMask(word, runeMaskMap)
-
 		if _, ok := wordsByMasks[mask]; !ok {
 			wordsByMasks[mask] = make([]Word, 0)
 		}
@@ -140,7 +141,7 @@ func makeWordSet(strWords []string) WordSet {
 	}
 }
 
-func ReadUniqWordStrings(path string) ([]string, error) {
+func ReadUniqWordStrings(path, whitelist string) ([]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -150,7 +151,6 @@ func ReadUniqWordStrings(path string) ([]string, error) {
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanWords)
 
-	whitelist := "abcdefghijklmnopqrstuvwzyxåäö"
 	whitemap := make(map[rune]struct{})
 	for _, r := range whitelist {
 		whitemap[r] = struct{}{}

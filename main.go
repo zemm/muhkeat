@@ -26,16 +26,16 @@ type WordSetMasks struct {
 func main() {
 	srcFile := "alastalon_salissa.txt"
 	whitelist := "abcdefghijklmnopqrstuvwzyxåäö"
-	wordStrings, err := ReadUniqWordStrings(srcFile, whitelist)
+	uniqWords, err := ReadUniqWordsFromFile(srcFile, whitelist)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	wordSet := makeWordSet(wordStrings)
+	wordSet := makeWordSet(uniqWords)
 	wordSetMasks := makeWordSetMasks(wordSet)
 
-	fmt.Printf("unique words: %d\n", len(wordStrings))
+	fmt.Printf("unique words: %d\n", len(uniqWords))
 	fmt.Printf("words with unique set of characters: %d\n", len(wordSetMasks.wordsByMasks))
 
 	// calculate plz
@@ -127,27 +127,26 @@ func (word Word) makeWordMask(runeMaskMap map[rune]uint64) uint64 {
 	return mask
 }
 
-func makeWordSet(strWords []string) WordSet {
-	words := make([]Word, 0, len(strWords))
+func makeWordSet(words []Word) WordSet {
 	allRunesMap := make(map[rune]struct{})
-	for _, strWord := range strWords {
-		word := Word(strWord)
-		words = append(words, word)
+	for _, word := range words {
 		for _, r := range word {
 			allRunesMap[r] = struct{}{}
 		}
 	}
-	runes := make([]rune, 0, len(allRunesMap))
+
+	allRunes := make([]rune, 0, len(allRunesMap))
 	for r := range allRunesMap {
-		runes = append(runes, r)
+		allRunes = append(allRunes, r)
 	}
+
 	return WordSet{
 		words: words,
-		runes: runes,
+		runes: allRunes,
 	}
 }
 
-func ReadUniqWordStrings(path, whitelist string) ([]string, error) {
+func ReadUniqWordsFromFile(path, whitelist string) ([]Word, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -177,9 +176,9 @@ func ReadUniqWordStrings(path, whitelist string) ([]string, error) {
 		}
 	}
 
-	uniqWords := make([]string, 0, len(wordMap))
+	uniqWords := make([]Word, 0, len(wordMap))
 	for word := range wordMap {
-		uniqWords = append(uniqWords, word)
+		uniqWords = append(uniqWords, Word(word))
 	}
 
 	return uniqWords, scanner.Err()

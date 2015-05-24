@@ -13,7 +13,6 @@ type WordMaskWeight uint8
 
 type WordSetMasks struct {
 	words []Word
-	runeMaskMap map[rune]WordMask
 	wordsByMasks map[WordMask][]Word
 	wordMasksPerWeight map[WordMaskWeight][]WordMask
 }
@@ -107,7 +106,6 @@ func makeWordSetMasks(words []Word) WordSetMasks {
 
 	return WordSetMasks{
 		words: words,
-		runeMaskMap: runeMaskMap,
 		wordsByMasks: wordsByMasks,
 		wordMasksPerWeight: wordMasksPerWeight,
 	}

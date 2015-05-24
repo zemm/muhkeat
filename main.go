@@ -4,11 +4,22 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 )
 
 type Word []rune
+
+type WordSet struct {
+	words []Word
+	runes []rune
+}
+
+type WordSetMasks struct {
+	wordSet WordSet
+	runeMaskMap map[rune]uint64
+	wordsByMasks map[uint64][]Word
+	wordMasksPerWeight map[uint8][]uint64
+}
 
 func main() {
 	wordStrings, err := ReadUniqWordStrings("alastalon_salissa.txt")
@@ -67,13 +78,6 @@ func main() {
 	}
 }
 
-type WordSetMasks struct {
-	wordSet WordSet
-	runeMaskMap map[rune]uint64
-	wordsByMasks map[uint64][]Word
-	wordMasksPerWeight map[uint8][]uint64
-}
-
 func makeWordSetMasks(wordSet WordSet) WordSetMasks {
 	runeMaskMap := make(map[rune]uint64)
 	for i, r := range wordSet.runes {
@@ -115,11 +119,6 @@ func makeWordMask(word Word, runeMaskMap map[rune]uint64) uint64 {
 	return mask
 }
 
-type WordSet struct {
-	words []Word
-	runes []rune
-}
-
 func makeWordSet(strWords []string) WordSet {
 	words := make([]Word, 0, len(strWords))
 	allRunesMap := make(map[rune]struct{})
@@ -149,14 +148,25 @@ func ReadUniqWordStrings(path string) ([]string, error) {
 
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanWords)
-	re := regexp.MustCompile(`[a-ö]+`)
+
+	whitelist := "abcdefghijklmnopqrstuvwzyxåäö"
+	whitemap := make(map[rune]struct{})
+	for _, r := range whitelist {
+		whitemap[r] = struct{}{}
+	}
+
 	wordMap := make(map[string]struct{})
 	for scanner.Scan() {
-		word := scanner.Text()
-		word = strings.ToLower(word)
-		word = re.FindString(word)
-		if word != "" {
-			wordMap[word] = struct{}{}
+		str := scanner.Text()
+		if str != "" {
+			str = strings.ToLower(str)
+			word := make([]rune, 0, len(str))
+			for _, r := range str {
+				if _, ok := whitemap[r]; ok {
+					word = append(word, r)
+				}
+			}
+			wordMap[string(word)] = struct{}{}
 		}
 	}
 

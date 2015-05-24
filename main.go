@@ -25,6 +25,7 @@ func main() {
 	wordStrings, err := ReadUniqWordStrings("alastalon_salissa.txt")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	wordSet := makeWordSet(wordStrings)

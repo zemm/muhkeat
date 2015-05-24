@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+// Types
+//
 type Word []rune
 
 type WordPair struct {
@@ -27,7 +29,7 @@ type WordMaskWeight uint8
 type WordSet struct {
 	words []Word
 	wordsByMasks map[WordMask][]Word
-	wordMasksPerWeight map[WordMaskWeight][]WordMask
+	wordMasksByWeight map[WordMaskWeight][]WordMask
 }
 
 type Opts struct {
@@ -35,6 +37,7 @@ type Opts struct {
 	whitelist string
 }
 
+// Parse program options
 func handleArgs([]string) Opts {
 	opts := Opts{
 		filename: "",
@@ -65,32 +68,70 @@ func handleArgs([]string) Opts {
 
 func main() {
 	opts := handleArgs(os.Args)
-	words, err := ReadWordSetFromFile(opts.filename, opts.whitelist)
+	words, err := readUniqWordsFromFile(opts.filename, opts.whitelist)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	wordSet := makeWordSet(words)
+	wordSet := NewWordSet(words)
 
-	fmt.Printf("             Reading file: %s\n", opts.filename)
-	fmt.Printf("         Qualifying chars: %s\n", opts.whitelist)
-	fmt.Printf("             Unique words: %d\n", len(words))
-	fmt.Printf("Words unique set of chars: %d\n", len(wordSet.wordsByMasks))
+	fmt.Printf("                    Reading file: %s\n", opts.filename)
+	fmt.Printf("                Qualifying chars: %s\n", opts.whitelist)
+	fmt.Printf("         Unique normalized words: %d\n", len(words))
+	fmt.Printf("Words with a unique set of chars: %d\n", len(wordSet.wordsByMasks))
 
 	// calculate plz
-	topWeight, topMasks := wordSet.findTopWeightAndPairs()
-	topWords := wordSet.findWordPairsByMasks(topMasks)
+	topWeight, topMasks := wordSet.topWeightAndPairs()
+	topWords := wordSet.maskPairsToWordPairs(topMasks)
 
 	fmt.Println()
-	fmt.Printf("          Top pair weight: %d\n", topWeight)
-	fmt.Printf("                Top pairs:\n")
+	fmt.Printf("Top pairs found (weight %d):\n", topWeight)
+	fmt.Printf("----------------------------\n")
 	for _, pair := range topWords {
 		fmt.Printf("%s %s\n", string(pair.a), string(pair.b))
 	}
 }
 
-func (ws WordSet) findWordPairsByMasks(maskPairs []WordMaskPair) []WordPair {
+// WordSet
+//
+
+// Create a helper structure for calculating the weights
+func NewWordSet(words []Word) *WordSet {
+	// create a map with which to create the word masks
+	runeMaskMap := make(map[rune]WordMask)
+	for i, r := range wordListUniqRunes(words) {
+		runeMaskMap[r] = 1 << WordMask(i)
+	}
+
+	// group words by their masks
+	wordsByMasks := make(map[WordMask][]Word)
+	for _, word := range words {
+		mask := word.mask(runeMaskMap)
+		if _, ok := wordsByMasks[mask]; !ok {
+			wordsByMasks[mask] = make([]Word, 0)
+		}
+		wordsByMasks[mask] = append(wordsByMasks[mask], word)
+	}
+
+	// group masks by their weights
+	wordMasksByWeight := make(map[WordMaskWeight][]WordMask, 0)
+	for mask := range wordsByMasks {
+		weight := mask.weight()
+		if _, ok := wordMasksByWeight[weight]; !ok {
+			wordMasksByWeight[weight] = make([]WordMask, 0)
+		}
+		wordMasksByWeight[weight] = append(wordMasksByWeight[weight], mask)
+	}
+
+	return &WordSet{
+		words: words,
+		wordsByMasks: wordsByMasks,
+		wordMasksByWeight: wordMasksByWeight,
+	}
+}
+
+func (ws WordSet) maskPairsToWordPairs(maskPairs []WordMaskPair) []WordPair {
 	wordPairs := make([]WordPair, 0)
 	for _, maskPair := range maskPairs {
 		for _, wordA := range ws.wordsByMasks[maskPair.a] {
@@ -102,23 +143,24 @@ func (ws WordSet) findWordPairsByMasks(maskPairs []WordMaskPair) []WordPair {
 	return wordPairs
 }
 
-func (ws WordSet) findTopWeightAndPairs() (WordMaskWeight, []WordMaskPair) {
+// Find mask pairs that have the most weight (most uniq chars)
+func (ws WordSet) topWeightAndPairs() (WordMaskWeight, []WordMaskPair) {
 	topWeight := WordMaskWeight(0)
 	var topPairs []WordMaskPair
 	checkedMasks := make(map[WordMask]struct{}, len(ws.wordsByMasks))
-	for iWeight, iMasks := range ws.wordMasksPerWeight {
+	for iWeight, iMasks := range ws.wordMasksByWeight {
 		for _, iMask := range iMasks {
 			checkedMasks[iMask] = struct{}{}
-			for jWeight, jMasks := range ws.wordMasksPerWeight {
+			for jWeight, jMasks := range ws.wordMasksByWeight {
 				if iWeight + jWeight < topWeight {
-					continue // this pair cannot win
+					continue // this weight combination cannot win
 				}
 				for _, jMask := range jMasks {
 					if _, ok := checkedMasks[jMask]; ok {
 						continue // this mask was already iMask
 					}
-					pairMask := iMask | jMask
-					pairWeight := popcount(pairMask)
+					pairMask := iMask.union(jMask)
+					pairWeight := pairMask.weight()
 					if pairWeight > topWeight {
 						topWeight = pairWeight
 						topPairs = make([]WordMaskPair, 0)
@@ -133,38 +175,11 @@ func (ws WordSet) findTopWeightAndPairs() (WordMaskWeight, []WordMaskPair) {
 	return topWeight, topPairs
 }
 
-func makeWordSet(words []Word) WordSet {
-	runeMaskMap := make(map[rune]WordMask)
-	for i, r := range wordSetRunes(words) {
-		runeMaskMap[r] = 1 << WordMask(i)
-	}
+// Word
+//
 
-	wordsByMasks := make(map[WordMask][]Word)
-	for _, word := range words {
-		mask := word.makeWordMask(runeMaskMap)
-		if _, ok := wordsByMasks[mask]; !ok {
-			wordsByMasks[mask] = make([]Word, 0)
-		}
-		wordsByMasks[mask] = append(wordsByMasks[mask], word)
-	}
-
-	wordMasksPerWeight := make(map[WordMaskWeight][]WordMask, 0)
-	for mask := range wordsByMasks {
-		weight := popcount(mask)
-		if _, ok := wordMasksPerWeight[weight]; !ok {
-			wordMasksPerWeight[weight] = make([]WordMask, 0)
-		}
-		wordMasksPerWeight[weight] = append(wordMasksPerWeight[weight], mask)
-	}
-
-	return WordSet{
-		words: words,
-		wordsByMasks: wordsByMasks,
-		wordMasksPerWeight: wordMasksPerWeight,
-	}
-}
-
-func (word Word) makeWordMask(runeMaskMap map[rune]WordMask) WordMask {
+// Calculate a mask for word given a rune mask map
+func (word Word) mask(runeMaskMap map[rune]WordMask) WordMask {
 	mask := WordMask(0)
 	for _, rune := range word {
 		mask = mask | runeMaskMap[rune]
@@ -172,7 +187,36 @@ func (word Word) makeWordMask(runeMaskMap map[rune]WordMask) WordMask {
 	return mask
 }
 
-func wordSetRunes(words []Word) Word {
+// WordMask
+//
+
+// Create an union wordmask from two masks
+func (wm WordMask) union(other WordMask) WordMask {
+	return wm | other
+}
+
+// Calculate the weight of the word mask
+// Weight is the amount of unique characters
+// http://en.wikipedia.org/wiki/Hamming_weight
+func (wm WordMask) weight() WordMaskWeight {
+	mask1 := uint64(6148914691236517205) // 01010101...
+	mask2 := uint64(3689348814741910323) // 00110011...
+	mask4 := uint64(1085102592571150095) // 00001111...
+	x := uint64(wm)
+	x = x - ((x >> 1) & mask1)
+	x = (x & mask2) + ((x >> 2) & mask2)
+	x = (x + (x >> 4)) & mask4
+	x = x + (x >> 8)
+	x = x + (x >> 16)
+	x = x + (x >> 32)
+	return WordMaskWeight(x)
+}
+
+// Helpers
+//
+
+// Find all unique runes from a list of words
+func wordListUniqRunes(words []Word) Word {
 	allRunesMap := make(map[rune]struct{})
 	for _, word := range words {
 		for _, r := range word {
@@ -188,7 +232,8 @@ func wordSetRunes(words []Word) Word {
 	return allRunes
 }
 
-func ReadWordSetFromFile(path, whitelist string) ([]Word, error) {
+// Read unique words from a file given a set of accepted characters
+func readUniqWordsFromFile(path, whitelist string) ([]Word, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -224,19 +269,4 @@ func ReadWordSetFromFile(path, whitelist string) ([]Word, error) {
 	}
 
 	return uniqWords, scanner.Err()
-}
-
-// http://en.wikipedia.org/wiki/Hamming_weight
-func popcount(wm WordMask) WordMaskWeight {
-	mask1 := uint64(6148914691236517205) // 01010101...
-	mask2 := uint64(3689348814741910323) // 00110011...
-	mask4 := uint64(1085102592571150095) // 00001111...
-	x := uint64(wm)
-	x = x - ((x >> 1) & mask1)
-	x = (x & mask2) + ((x >> 2) & mask2)
-	x = (x + (x >> 4)) & mask4
-	x = x + (x >> 8)
-	x = x + (x >> 16)
-	x = x + (x >> 32)
-	return WordMaskWeight(x)
 }

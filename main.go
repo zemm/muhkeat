@@ -33,14 +33,31 @@ func main() {
 	wordSet := makeWordSet(wordStrings)
 	wordSetMasks := makeWordSetMasks(wordSet)
 
-	wordMaskCount := len(wordSetMasks.wordsByMasks)
 	fmt.Printf("unique words: %d\n", len(wordStrings))
-	fmt.Printf("words with unique set of characters: %d\n", wordMaskCount)
+	fmt.Printf("words with unique set of characters: %d\n", len(wordSetMasks.wordsByMasks))
 
 	// calculate plz
+	topWeight, topMasks := findTopWeightAndMasks(wordSetMasks)
+
+	fmt.Printf("top pair weight: %d\n", topWeight)
+	fmt.Println("top pairs:")
+	for _, masks := range topMasks {
+		fmt.Printf(" ")
+		for _, word := range wordSetMasks.wordsByMasks[masks[0]] {
+			fmt.Printf(" %s", string(word))
+		}
+		fmt.Printf(" +")
+		for _, word := range wordSetMasks.wordsByMasks[masks[1]] {
+			fmt.Printf(" %s", string(word))
+		}
+		fmt.Println()
+	}
+}
+
+func findTopWeightAndMasks(wordSetMasks WordSetMasks) (uint8, [][]uint64) {
 	topWeight := uint8(0)
 	var topMasks [][]uint64
-	checkedMasks := make(map[uint64]struct{}, wordMaskCount)
+	checkedMasks := make(map[uint64]struct{}, len(wordSetMasks.wordsByMasks))
 	for iWeight, iMasks := range wordSetMasks.wordMasksPerWeight {
 		for _, iMask := range iMasks {
 			checkedMasks[iMask] = struct{}{}
@@ -65,20 +82,7 @@ func main() {
 			}
 		}
 	}
-
-	fmt.Printf("top pair weight: %d\n", topWeight)
-	fmt.Println("top pairs:")
-	for _, masks := range topMasks {
-		fmt.Printf(" ")
-		for _, word := range wordSetMasks.wordsByMasks[masks[0]] {
-			fmt.Printf(" %s", string(word))
-		}
-		fmt.Printf(" +")
-		for _, word := range wordSetMasks.wordsByMasks[masks[1]] {
-			fmt.Printf(" %s", string(word))
-		}
-		fmt.Println()
-	}
+	return topWeight, topMasks
 }
 
 func makeWordSetMasks(wordSet WordSet) WordSetMasks {

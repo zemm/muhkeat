@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-// Types
-//
 type Word []rune
 
 type WordPair struct {
@@ -131,6 +129,7 @@ func NewWordSet(words []Word) *WordSet {
 	}
 }
 
+// Convert mask-pairs to words-pairs
 func (ws WordSet) maskPairsToWordPairs(maskPairs []WordMaskPair) []WordPair {
 	wordPairs := make([]WordPair, 0)
 	for _, maskPair := range maskPairs {
@@ -157,7 +156,7 @@ func (ws WordSet) topWeightAndPairs() (WordMaskWeight, []WordMaskPair) {
 				}
 				for _, jMask := range jMasks {
 					if _, ok := checkedMasks[jMask]; ok {
-						continue // this mask was already iMask
+						continue // mask already checked
 					}
 					pairMask := iMask.union(jMask)
 					pairWeight := pairMask.weight()

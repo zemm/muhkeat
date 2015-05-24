@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 )
 
@@ -30,43 +30,12 @@ type WordSet struct {
 	wordMasksByWeight map[WordMaskWeight][]WordMask
 }
 
-type Opts struct {
-	filename string
-	whitelist string
-}
-
-// Parse program options
-func handleArgs([]string) Opts {
-	opts := Opts{
-		filename: "",
-		whitelist: "abcdefghijklmnopqrstuvwzyxåäö",
-	}
-	args := make([]string, 0)
-	flags := make([]string, 0)
-	for _, arg := range os.Args[1:] {
-		if arg[0] == '-' {
-			flags = append(flags, arg)
-		} else {
-			args = append(args, arg)
-		}
-	}
-	switch(len(args)) {
-		case 1:
-			opts.filename = args[0]
-		case 2:
-			opts.filename = args[0]
-			opts.whitelist = args[1]
-	}
-	if len(flags) > 0 || opts.filename == "" {
-		fmt.Printf("Usage: %s filename [whitelistChars]\n", path.Base(os.Args[0]))
-		os.Exit(255)
-	}
-	return opts
-}
-
 func main() {
-	opts := handleArgs(os.Args)
-	words, err := readUniqWordsFromFile(opts.filename, opts.whitelist)
+	filename := flag.String("f", "alastalon_salissa.txt", "source file")
+	whitelistChars := flag.String("c", "abcdefghijklmnopqrstuvwzyxåäö", "handled characters")
+	flag.Parse()
+
+	words, err := readUniqWordsFromFile(*filename, *whitelistChars)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -74,18 +43,18 @@ func main() {
 
 	wordSet := NewWordSet(words)
 
-	fmt.Printf("                    Reading file: %s\n", opts.filename)
-	fmt.Printf("                Qualifying chars: %s\n", opts.whitelist)
-	fmt.Printf("         Unique normalized words: %d\n", len(words))
-	fmt.Printf("Words with a unique set of chars: %d\n", len(wordSet.wordsByMasks))
+	fmt.Printf("                      Input file: %s\n", *filename)
+	fmt.Printf("              Characters handled: %s\n", *whitelistChars)
+	fmt.Printf(" Unique (case insensitive) words: %d\n", len(words))
+	fmt.Printf("            Unique sets of chars: %d\n", len(wordSet.wordsByMasks))
 
 	// calculate plz
 	topWeight, topMasks := wordSet.topWeightAndPairs()
 	topWords := wordSet.maskPairsToWordPairs(topMasks)
 
 	fmt.Println()
-	fmt.Printf("Top pairs found (weight %d):\n", topWeight)
-	fmt.Printf("----------------------------\n")
+	fmt.Printf(" Top pairs found (weight %d)\n", topWeight)
+	fmt.Printf("-----------------------------\n")
 	for _, pair := range topWords {
 		fmt.Printf("%s %s\n", string(pair.a), string(pair.b))
 	}

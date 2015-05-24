@@ -8,6 +8,8 @@ import (
 )
 
 type Word []rune
+type WordMask []uint64
+type WordMaskWeight uint8
 
 type WordSet struct {
 	words []Word
@@ -18,7 +20,7 @@ type WordSetMasks struct {
 	wordSet WordSet
 	runeMaskMap map[rune]uint64
 	wordsByMasks map[uint64][]Word
-	wordMasksPerWeight map[uint8][]uint64
+	wordMasksPerWeight map[WordMaskWeight]WordMask
 }
 
 func main() {
@@ -54,9 +56,9 @@ func main() {
 	}
 }
 
-func findTopWeightAndMasks(wordSetMasks WordSetMasks) (uint8, [][]uint64) {
-	topWeight := uint8(0)
-	var topMasks [][]uint64
+func findTopWeightAndMasks(wordSetMasks WordSetMasks) (WordMaskWeight, []WordMask) {
+	topWeight := WordMaskWeight(0)
+	var topMasks []WordMask
 	checkedMasks := make(map[uint64]struct{}, len(wordSetMasks.wordsByMasks))
 	for iWeight, iMasks := range wordSetMasks.wordMasksPerWeight {
 		for _, iMask := range iMasks {
@@ -73,10 +75,10 @@ func findTopWeightAndMasks(wordSetMasks WordSetMasks) (uint8, [][]uint64) {
 					pairWeight := popcount(pairMask)
 					if pairWeight > topWeight {
 						topWeight = pairWeight
-						topMasks = make([][]uint64, 0)
+						topMasks = make([]WordMask, 0)
 					}
 					if pairWeight == topWeight {
-						topMasks = append(topMasks, []uint64{iMask,jMask})
+						topMasks = append(topMasks, WordMask{iMask,jMask})
 					}
 				}
 			}
@@ -93,18 +95,18 @@ func makeWordSetMasks(wordSet WordSet) WordSetMasks {
 
 	wordsByMasks := make(map[uint64][]Word)
 	for _, word := range wordSet.words {
-		mask := makeWordMask(word, runeMaskMap)
+		mask := word.makeWordMask(runeMaskMap)
 		if _, ok := wordsByMasks[mask]; !ok {
 			wordsByMasks[mask] = make([]Word, 0)
 		}
 		wordsByMasks[mask] = append(wordsByMasks[mask], word)
 	}
 
-	wordMasksPerWeight := make(map[uint8][]uint64, 0)
+	wordMasksPerWeight := make(map[WordMaskWeight]WordMask, 0)
 	for mask := range wordsByMasks {
 		weight := popcount(mask)
 		if _, ok := wordMasksPerWeight[weight]; !ok {
-			wordMasksPerWeight[weight] = make([]uint64, 0)
+			wordMasksPerWeight[weight] = make(WordMask, 0)
 		}
 		wordMasksPerWeight[weight] = append(wordMasksPerWeight[weight], mask)
 	}
@@ -117,7 +119,7 @@ func makeWordSetMasks(wordSet WordSet) WordSetMasks {
 	}
 }
 
-func makeWordMask(word Word, runeMaskMap map[rune]uint64) uint64 {
+func (word Word) makeWordMask(runeMaskMap map[rune]uint64) uint64 {
 	mask := uint64(0)
 	for _, rune := range word {
 		mask = mask | runeMaskMap[rune]
@@ -184,7 +186,7 @@ func ReadUniqWordStrings(path, whitelist string) ([]string, error) {
 }
 
 // http://en.wikipedia.org/wiki/Hamming_weight
-func popcount(x uint64) uint8 {
+func popcount(x uint64) WordMaskWeight {
 	mask1 := uint64(6148914691236517205) // 01010101...
 	mask2 := uint64(3689348814741910323) // 00110011...
 	mask4 := uint64(1085102592571150095) // 00001111...
@@ -194,5 +196,5 @@ func popcount(x uint64) uint8 {
 	x = x + (x >> 8)
 	x = x + (x >> 16)
 	x = x + (x >> 32)
-	return uint8(x)
+	return WordMaskWeight(x)
 }

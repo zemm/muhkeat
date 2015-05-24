@@ -32,7 +32,7 @@ func main() {
 	fmt.Printf("words with unique set of characters: %d\n", len(wordSetMasks.wordsByMasks))
 
 	// calculate plz
-	topWeight, topMasks := findTopWeightAndMasks(wordSetMasks)
+	topWeight, topMasks := wordSetMasks.findTopWeightAndMasks()
 
 	fmt.Printf("top pair weight: %d\n", topWeight)
 	fmt.Println("top pairs:")
@@ -49,7 +49,7 @@ func main() {
 	}
 }
 
-func findTopWeightAndMasks(wordSetMasks WordSetMasks) (WordMaskWeight, [][]WordMask) {
+func (wordSetMasks WordSetMasks) findTopWeightAndMasks() (WordMaskWeight, [][]WordMask) {
 	topWeight := WordMaskWeight(0)
 	var topMasks [][]WordMask
 	checkedMasks := make(map[WordMask]struct{}, len(wordSetMasks.wordsByMasks))

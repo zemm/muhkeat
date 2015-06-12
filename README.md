@@ -17,4 +17,4 @@ I wanted to test Go with something simpleish.
 
 Who
 ---
-Jussi Rajala <zemm@iki.fi> https://github.com/zemm
+https://github.com/zemm
